@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { AuthContext } from "../context/AuthCont.jsx";
 import { useNavigate, Link } from "react-router-dom";
 
@@ -8,18 +8,47 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+
+  const emailRef = useRef(null);
+  const formRef = useRef(null);
 
   function handleSubmit(e) {
     e.preventDefault();
 
-    const success = login(email, password);
+    // limpa erro anterior
+    emailRef.current.setCustomValidity("");
 
-    if (success) {
+    // =========================
+    // ADMIN SIMPLES (FACILITADO)
+    // =========================
+    if (email === "admin@patinhas.com") {
+      login(email, password); // senha qualquer
       navigate("/");
-    } else {
-      setError("E-mail ou senha inválidos");
+      return;
     }
+
+    // =========================
+    // USUÁRIO NORMAL
+    // =========================
+    const usuarios =
+      JSON.parse(localStorage.getItem("usuarios")) || [];
+
+    const usuarioValido = usuarios.find(
+      (u) => u.email === email && u.password === password
+    );
+
+    // ❌ INVÁLIDO → ERRO VISÍVEL
+    if (!usuarioValido) {
+      emailRef.current.setCustomValidity(
+        "E-mail ou senha inválidos"
+      );
+      formRef.current.reportValidity();
+      return;
+    }
+
+    // ✅ LOGIN NORMAL
+    login(email, password);
+    navigate("/");
   }
 
   return (
@@ -28,8 +57,9 @@ export default function Login() {
         Faça login 🐾
       </h2>
 
-      <form onSubmit={handleSubmit}>
+      <form ref={formRef} onSubmit={handleSubmit}>
         <input
+          ref={emailRef}
           type="email"
           className="form-control mb-3"
           placeholder="E-mail cadastrado"
@@ -46,8 +76,6 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-
-        {error && <div className="alert alert-danger">{error}</div>}
 
         <button className="btn btn-warning w-100 mb-3">
           Entrar com cadastro existente

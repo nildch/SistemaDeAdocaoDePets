@@ -1,47 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AuthContext } from "./AuthCont.jsx";
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const loggedUser = localStorage.getItem("user");
-    if (loggedUser) {
-      setUser(JSON.parse(loggedUser));
-    }
-  }, []);
-
   function login(email, password) {
-    const registeredUser = JSON.parse(localStorage.getItem("registeredUser"));
-
-    if (!registeredUser) return false;
-
-    if (
-      registeredUser.email === email &&
-      registeredUser.password === password
-    ) {
-      setUser(registeredUser);
-      localStorage.setItem("user", JSON.stringify(registeredUser));
+    // 👑 ADMIN FIXO
+    if (email === "admin@patinhas.com") {
+      setUser({
+        name: "Admin",
+        email,
+        role: "admin",
+      });
       return true;
     }
 
-    return false;
+    // 👤 USUÁRIO COMUM (TEM QUE ESTAR CADASTRADO)
+    const usuariosSalvos =
+      JSON.parse(localStorage.getItem("usuarios")) || [];
+
+    const usuarioEncontrado = usuariosSalvos.find(
+      (u) => u.email === email && u.password === password
+    );
+
+    if (!usuarioEncontrado) {
+      return false; // ❌ NÃO DEIXA ENTRAR
+    }
+
+    setUser({
+      name: usuarioEncontrado.name,
+      email: usuarioEncontrado.email,
+      role: "user",
+    });
+
+    return true;
   }
 
   function logout() {
     setUser(null);
-    localStorage.removeItem("user");
-  }
-
-  function register(name, email, password, phone) {
-    const newUser = { name, email, password, phone };
-    localStorage.setItem("registeredUser", JSON.stringify(newUser));
-    setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, register }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
