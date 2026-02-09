@@ -2,6 +2,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveUser, getUsers } from "../services/userStorage.js";
 
+const R = {
+  nome: /^[A-Za-zÀ-ÿ\s]*$/,
+  telefone: /^\d*$/,
+  email: /^\S+@\S+\.\S+$/
+};
+
+const LABELS = {
+  name: "Nome completo",
+  email: "E-mail",
+  phone: "Telefone",
+  password: "Senha",
+  confirmPassword: "Confirmar senha"
+};
+
 export default function Register() {
   const navigate = useNavigate();
 
@@ -13,122 +27,115 @@ export default function Register() {
     confirmPassword: ""
   });
 
-  const [error, setError] = useState("");
+  const [fe, setFe] = useState({});
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  const liveValidate = (name, value) => {
+    let error = null;
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-
-    // NOME
-    if (!/^[A-Za-z\s]+$/.test(form.name)) {
-      setError("Nome só pode conter letras e espaços");
-      return;
-    }
-    if (form.name.length < 12 || form.name.length > 500) {
-      setError("Nome deve ter entre 12 e 500 caracteres");
-      return;
+    if (name === "name") {
+      if (!R.nome.test(value))
+        error = `O campo ${LABELS.name} aceita apenas letras e espaços`;
+      else if (value && value.length < 12)
+        error = `${LABELS.name} deve ter pelo menos 12 caracteres`;
     }
 
-    // EMAIL
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) {
-      setError("E-mail inválido");
-      return;
+    if (name === "email") {
+      if (value && !R.email.test(value))
+        error = `Informe um ${LABELS.email} válido`;
     }
 
-    // TELEFONE
-    if (!/^\d+$/.test(form.phone)) {
-      setError("Telefone só pode conter números");
-      return;
-    }
-    if (form.phone.length < 9) {
-      setError("Telefone deve ter ao menos 9 números");
-      return;
+    if (name === "phone") {
+      if (!R.telefone.test(value))
+        error = `O campo ${LABELS.phone} aceita apenas números`;
+      else if (value && value.length < 9)
+        error = `${LABELS.phone} deve ter no mínimo 9 números`;
     }
 
-    // SENHA
-    if (form.password.length < 6) {
-      setError("Senha deve ter pelo menos 6 caracteres");
-      return;
+    if (name === "password") {
+      if (value && value.length < 6)
+        error = `${LABELS.password} deve ter no mínimo 6 caracteres`;
     }
 
-    // CONFIRMAÇÃO DE SENHA
-    if (form.password !== form.confirmPassword) {
-      setError("Senhas não conferem");
-      return;
+    if (name === "confirmPassword") {
+      if (value && value !== form.password)
+        error = "As senhas não conferem";
     }
 
-    // EMAIL JÁ CADASTRADO
-    const usuarios = getUsers();
-    if (usuarios.some(u => u.email === form.email)) {
-      setError("Este e-mail já está cadastrado");
-      return;
-    }
+    setFe(p => ({ ...p, [name]: error }));
+    return error;
+  };
 
-    // SALVAR
-    saveUser({
-      name: form.name,
-      email: form.email,
-      phone: form.phone,
-      password: form.password
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setForm(p => ({ ...p, [name]: value }));
+    liveValidate(name, value);
+  };
+
+  const validateFinal = () => {
+    const e = {};
+
+    // obrigatórios
+    Object.keys(LABELS).forEach(k => {
+      if (!form[k]) {
+        e[k] = `O campo ${LABELS[k]} é obrigatório`;
+      }
     });
 
+    // regras específicas
+    Object.keys(form).forEach(k => {
+      const err = liveValidate(k, form[k]);
+      if (err) e[k] = err;
+    });
+
+    // email duplicado
+    const usuarios = getUsers();
+    if (usuarios.some(u => u.email === form.email)) {
+      e.email = "Este e-mail já está cadastrado";
+    }
+
+    setFe(e);
+    return !Object.keys(e).length;
+  };
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!validateFinal()) return;
+
+    saveUser(form);
     alert("Cadastro realizado com sucesso!");
     navigate("/");
-  }
+  };
+
+  const input = (name, type = "text") => (
+    <div className="mb-2">
+      <label className="form-label fw-semibold">{LABELS[name]}</label>
+      <input
+        name={name}
+        type={type}
+        value={form[name]}
+        onChange={handleChange}
+        className={`form-control ${fe[name] ? "is-invalid" : ""}`}
+      />
+      {fe[name] && (
+        <div className="invalid-feedback d-block">{fe[name]}</div>
+      )}
+    </div>
+  );
 
   return (
-    <div className="container mt-5" style={{ maxWidth: "450px" }}>
-      <h2 className="text-center mb-4" style={{ color: "#FF6F00" }}>
-        Cadastro
-      </h2>
+    <div className="container mt-5" style={{ maxWidth: 450 }}>
+      <h2 className="text-center mb-4 text-warning">Cadastro</h2>
 
       <form onSubmit={handleSubmit}>
-        <input
-          name="name"
-          className="form-control mb-2"
-          placeholder="Nome completo"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="email"
-          type="email"
-          className="form-control mb-2"
-          placeholder="E-mail"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="phone"
-          className="form-control mb-2"
-          placeholder="Telefone"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="password"
-          type="password"
-          className="form-control mb-2"
-          placeholder="Senha"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="confirmPassword"
-          type="password"
-          className="form-control mb-3"
-          placeholder="Confirmar senha"
-          onChange={handleChange}
-          required
-        />
+        {input("name")}
+        {input("email", "email")}
+        {input("phone")}
+        {input("password", "password")}
+        {input("confirmPassword", "password")}
 
-        {error && <div className="alert alert-danger">{error}</div>}
-
-        <button className="btn btn-warning w-100">Cadastrar</button>
+        <button className="btn btn-warning w-100 fw-bold mt-3">
+          Cadastrar
+        </button>
       </form>
     </div>
   );

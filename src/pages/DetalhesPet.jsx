@@ -3,56 +3,53 @@ import { useEffect, useState } from "react";
 
 export default function DetalhesPet() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const [pet, setPet] = useState(null);
+  const nav = useNavigate();
+  const [pet,setPet]=useState(null);
 
-  useEffect(() => {
-    const petsSalvos = JSON.parse(localStorage.getItem("pets")) || [];
-    const encontrado = petsSalvos.find(
-      (p) => String(p.id) === String(id)
-    );
-    setPet(encontrado);
-  }, [id]);
+  useEffect(()=>{
+    const pets=JSON.parse(localStorage.getItem("pets"))||[];
+    setPet(pets.find(p=>String(p.id)===String(id)));
+  },[id]);
 
-  if (!pet) {
-    return (
-      <div className="container mt-5 text-center">
-        <p>Pet não encontrado 😢</p>
-        <button className="btn btn-secondary" onClick={() => navigate("/adocao")}>
-          Voltar
-        </button>
-      </div>
-    );
-  }
+  if(!pet) return (
+    <div className="container mt-5 text-center">
+      <p>Pet não encontrado 😢</p>
+      <button className="btn btn-secondary" onClick={()=>nav("/adocao")}>Voltar</button>
+    </div>
+  );
 
   return (
     <div className="container mt-5">
-      <button className="btn btn-outline-secondary mb-4" onClick={() => navigate(-1)}>
-        ← Voltar
-      </button>
+      <button className="btn btn-outline-secondary mb-4" onClick={()=>nav(-1)}>← Voltar</button>
 
       <div className="card shadow p-4">
-        <img
-          src={pet.foto}
-          alt={pet.nome}
-          style={{ width: "100%", maxHeight: "350px", objectFit: "cover" }}
-        />
 
-        <h2 className="mt-3">{pet.nome}</h2>
+        <div className="d-flex justify-content-center mb-4">
+          <img src={pet.foto} alt={pet.nome} className="img-fluid"
+            style={{maxWidth:500,maxHeight:350,objectFit:"cover",borderRadius:12}}/>
+        </div>
 
-        <p><strong>Espécie:</strong> {pet.especie}</p>
-        <p><strong>Raça:</strong> {pet.raca}</p>
-        <p><strong>Porte:</strong> {pet.porte}</p>
-        <p><strong>Gênero:</strong> {pet.genero}</p>
-        <p><strong>Idade:</strong> {pet.idade}</p>
+        <h2 className="text-center">{pet.nome}</h2>
+
+        {[
+          ["Espécie",pet.especie],
+          ["Raça",pet.raca],
+          ["Porte",pet.porte],
+          ["Gênero",pet.genero],
+          ["Idade",pet.idade],
+        ].map(([l,v],i)=>(
+          <p key={i}><strong>{l}:</strong> {v}</p>
+        ))}
+
+        {pet.temCondicoes && (
+          <p><strong>Condições especiais:</strong> {pet.condicoes}</p>
+        )}
 
         <p className="mt-3">{pet.descricao}</p>
 
         <p>
           <strong>Status:</strong>{" "}
-          <span className="badge bg-success">
-            {pet.statusAdocao}
-          </span>
+          <span className="badge bg-success">{pet.statusAdocao}</span>
         </p>
       </div>
     </div>

@@ -3,149 +3,248 @@ import { AuthContext } from "../context/AuthCont.jsx";
 import { Navigate, useNavigate } from "react-router-dom";
 import { savePet } from "../services/petStorage.js";
 
+const R = {
+  letras: /^[A-Za-zÀ-ÿ\s]*$/,
+  idadeChars: /^[A-Za-zÀ-ÿ0-9\s.,]*$/,
+  condicoes: /^[A-Za-zÀ-ÿ0-9\s.,-]*$/,
+  descricao: /^[A-Za-zÀ-ÿ0-9\s.,]*$/
+};
+
+const LABELS = {
+  nome: "nome",
+  idade: "idade",
+  especie: "espécie",
+  raca: "raça",
+  porte: "porte",
+  genero: "gênero",
+  condicoes: "condições especiais",
+  descricao: "descrição",
+  foto: "foto"
+};
+
 export default function CadastroPet() {
   const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
-
-  // Estados dos campos
-  const [nome, setNome] = useState("");
-  const [idade, setIdade] = useState("");
-  const [especie, setEspecie] = useState("");
-  const [raca, setRaca] = useState("");
-  const [porte, setPorte] = useState("Pequeno");
-  const [genero, setGenero] = useState("Macho");
-  const [condicoes, setCondicoes] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [foto, setFoto] = useState("");
-  const [error, setError] = useState("");
-
+  const nav = useNavigate();
   if (!user || user.role !== "admin") return <Navigate to="/" />;
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
+  const [f, setF] = useState({
+    nome: "",
+    idade: "",
+    especie: "",
+    raca: "",
+    porte: "",
+    genero: "",
+    temCondicoes: false,
+    condicoes: "",
+    descricao: "",
+    foto: ""
+  });
 
-    // --- VALIDAÇÕES OBRIGATÓRIAS ---
-    if (!/^[A-Za-zÀ-ÿ\s]+$/.test(nome)) {
-      setError("Preencha os campos necessários.");
-      return;
-    }
-  
-    if (especie.length < 3 || raca.length < 3) {
-      setError("Espécie e Raça devem ter pelo menos 3 caracteres");
-      return;
-    }
-    if (nome.length < 3 || nome.length > 100) {
-      setError("Nome deve ter entre 3 e 100 caracteres");
-      return;
-    }
+  const [fe, setFe] = useState({});
 
-    if (!/^\d+$/.test(idade)) {
-      setError("Idade só pode conter números");
-      return;
-    }
+  const liveValidate = (name, value) => {
+    let error = null;
 
-    if (especie.trim() === "" || raca.trim() === "") {
-      setError("Espécie e Raça são obrigatórios");
-      return;
+    if (name === "nome") {
+      if (!R.letras.test(value))
+        error = `O campo ${LABELS.nome} aceita apenas letras e espaços`;
+      else if (value && value.length < 3)
+        error = `${LABELS.nome} deve ter pelo menos 3 caracteres`;
     }
 
-    if (condicoes.length < 10 || condicoes.length > 255) {
-      setError("Condições especiais devem ter entre 10 e 255 caracteres");
-      return;
+    if (name === "especie" || name === "raca") {
+      if (!R.letras.test(value))
+        error = `O campo ${LABELS[name]} não aceita números ou símbolos`;
     }
 
-    if (descricao.length < 30 || descricao.length > 2000) {
-      setError("Descrição deve ter entre 30 e 2000 caracteres");
-      return;
+    if (name === "idade") {
+      if (!R.idadeChars.test(value))
+        error = `O campo ${LABELS.idade} não aceita símbolos especiais`;
+      else {
+        const nums = value.match(/\d/g);
+        if (!nums)
+          error = `O campo ${LABELS.idade} precisa conter ao menos um número`;
+        else if (nums.length > 3)
+          error = `O campo ${LABELS.idade} aceita no máximo 3 números`;
+      }
     }
 
-    if (!foto.startsWith("http")) {
-      setError("Informe uma URL válida para a foto (começando com http)");
-      return;
+    if (name === "condicoes") {
+      if (!R.condicoes.test(value))
+        error = `O campo ${LABELS.condicoes} aceita apenas letras, números, ponto, vírgula e hífen`;
+      else if (value && value.length < 10)
+        error = `${LABELS.condicoes} deve ter no mínimo 10 caracteres`;
     }
 
-    try {
-      // O objeto deve conter as chaves EXATAS que DetalhesPet.jsx e Adocao.jsx usam
-      await savePet({
-        id: Date.now(),
-        nome,
-        idade: `${idade} anos`, // Formatado para exibição
-        especie,
-        raca,
-        porte,
-        genero,
-        condicoes,
-        descricao,
-        foto,
-        statusAdocao: "Disponível" // Exatamente como o filtro no Adocao.jsx espera
-      });
-
-      navigate("/adocao");
-    } catch (err) {
-      setError("Erro ao salvar o pet. Tente novamente.");
+    if (name === "descricao") {
+      if (!R.descricao.test(value))
+        error = `O campo ${LABELS.descricao} aceita apenas letras, números, ponto e vírgula`;
+      else if (value && value.length < 30)
+        error = `${LABELS.descricao} deve ter no mínimo 30 caracteres`;
     }
+
+    setFe(p => ({ ...p, [name]: error }));
+    return error;
+  };
+
+  const ch = e => {
+    const { name, value, type, checked } = e.target;
+    const v = type === "checkbox" ? checked : value;
+    setF(p => ({ ...p, [name]: v }));
+    liveValidate(name, v);
+  };
+
+  const validateFinal = () => {
+  const e = {};
+
+  // obrigatórios
+  Object.keys(LABELS).forEach(k => {
+    if (k === "condicoes" && !f.temCondicoes) return;
+
+    if (!f[k]) {
+      e[k] = `O campo ${LABELS[k]} é obrigatório`;
+    }
+  });
+
+  // valida regras específicas
+  Object.keys(f).forEach(k => {
+    const err = liveValidate(k, f[k]);
+    if (err) e[k] = err;
+  });
+
+  // foto obrigatória (reforço)
+  if (!f.foto) {
+    e.foto = "O campo Foto é obrigatório";
   }
 
+  setFe(e);
+  return !Object.keys(e).length;
+};
+
+  const sub = e => {
+    e.preventDefault();
+    if (!validateFinal()) return;
+
+    savePet({
+      id: Date.now(),
+      ...f,
+      statusAdocao: "Disponível"
+    });
+
+    nav("/adocao");
+  };
+
+  const input = (name, label) => (
+    <div className="mb-2">
+      <label className="form-label fw-semibold">{label}</label>
+      <input
+        name={name}
+        value={f[name]}
+        onChange={ch}
+        className={`form-control ${fe[name] ? "is-invalid" : ""}`}
+      />
+      {fe[name] && <div className="invalid-feedback d-block">{fe[name]}</div>}
+    </div>
+  );
+
   return (
-    <div className="container mt-4 mb-5" style={{ maxWidth: "700px" }}>
+    <div className="container mt-4 mb-5" style={{ maxWidth: 700 }}>
       <div className="card shadow p-4">
-        <h2 className="mb-4 text-center">🐾 Cadastrar Novo Pet</h2>
+        <h2 className="text-center mb-4">🐾 Cadastrar Pet</h2>
 
-        <form onSubmit={handleSubmit}>
-          <div className="row">
-            <div className="col-md-8">
-              <label className="form-label">Nome do Pet</label>
-              <input className="form-control mb-3" placeholder="Ex: Bob" value={nome} onChange={e => setNome(e.target.value)} />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label">Idade (anos)</label>
-              <input className="form-control mb-3" placeholder="Ex: 2" value={idade} onChange={e => setIdade(e.target.value)} />
-            </div>
-          </div>
+        <form onSubmit={sub}>
+          {input("nome", "Nome do Pet")}
+          {input("idade", "Idade")}
+          {input("especie", "Espécie")}
+          {input("raca", "Raça")}
 
-          <div className="row">
-            <div className="col-md-6">
-              <label className="form-label">Espécie</label>
-              <input className="form-control mb-3" placeholder="Cão, Gato..." value={especie} onChange={e => setEspecie(e.target.value)} />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Raça</label>
-              <input className="form-control mb-3" placeholder="Ex: Poodle" value={raca} onChange={e => setRaca(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="row mb-3">
-            <div className="col-md-6">
-              <label className="form-label">Porte</label>
-              <select className="form-select" value={porte} onChange={e => setPorte(e.target.value)}>
-                <option value="Pequeno">Pequeno</option>
-                <option value="Médio">Médio</option>
-                <option value="Grande">Grande</option>
+          <div className="row mb-2">
+            <div className="col">
+              <label className="form-label fw-semibold">Porte</label>
+              <select
+                name="porte"
+                value={f.porte}
+                onChange={ch}
+                className={`form-select ${fe.porte ? "is-invalid" : ""}`}
+              >
+                <option value="">Selecione</option>
+                <option>Pequeno</option>
+                <option>Médio</option>
+                <option>Grande</option>
               </select>
+              {fe.porte && <div className="invalid-feedback d-block">{fe.porte}</div>}
             </div>
-            <div className="col-md-6">
-              <label className="form-label">Gênero</label>
-              <select className="form-select" value={genero} onChange={e => setGenero(e.target.value)}>
-                <option value="Macho">Macho</option>
-                <option value="Fêmea">Fêmea</option>
+
+            <div className="col">
+              <label className="form-label fw-semibold">Gênero</label>
+              <select
+                name="genero"
+                value={f.genero}
+                onChange={ch}
+                className={`form-select ${fe.genero ? "is-invalid" : ""}`}
+              >
+                <option value="">Selecione</option>
+                <option>Macho</option>
+                <option>Fêmea</option>
               </select>
+              {fe.genero && <div className="invalid-feedback d-block">{fe.genero}</div>}
             </div>
           </div>
 
-          <label className="form-label">Condições Especiais</label>
-          <textarea className="form-control mb-3" rows="2" value={condicoes} onChange={e => setCondicoes(e.target.value)} />
+          <div className="form-check mb-2">
+            <input
+              type="checkbox"
+              className="form-check-input"
+              name="temCondicoes"
+              checked={f.temCondicoes}
+              onChange={ch}
+            />
+            <label className="form-check-label">
+              Possui condições especiais?
+            </label>
+          </div>
 
-          <label className="form-label">Descrição</label>
-          <textarea className="form-control mb-3" rows="4" value={descricao} onChange={e => setDescricao(e.target.value)} />
+          {f.temCondicoes && input("condicoes", "Condições especiais")}
 
-          <label className="form-label">URL da Foto</label>
-          <input className="form-control mb-3" placeholder="https://..." value={foto} onChange={e => setFoto(e.target.value)} />
+          <div className="mb-2">
+            <label className="form-label fw-semibold">Descrição</label>
+            <textarea
+              name="descricao"
+              rows="4"
+              value={f.descricao}
+              onChange={ch}
+              className={`form-control ${fe.descricao ? "is-invalid" : ""}`}
+            />
+            {fe.descricao && (
+              <div className="invalid-feedback d-block">{fe.descricao}</div>
+            )}
+          </div>
 
-          {error && <div className="alert alert-danger py-2">{error}</div>}
+          <div className="mb-2">
+            <label className="form-label fw-semibold">Foto do Pet</label>
+            <input
+              type="file"
+              accept="image/*"
+              className={`form-control ${fe.foto ? "is-invalid" : ""}`}
+              onChange={e => {
+                const file = e.target.files[0];
+                if (!file) {
+                  setFe(p => ({ ...p, foto: "O campo Foto é obrigatório" }));
+                  return;
+                }
+                const r = new FileReader();
+                r.onload = () => {
+                  setF(p => ({ ...p, foto: r.result }));
+                  setFe(p => ({ ...p, foto: null }));
+                };
+                r.readAsDataURL(file);
+              }}
+            />
+            {fe.foto && <div className="invalid-feedback d-block">{fe.foto}</div>}
+          </div>
 
-          <button className="btn btn-warning w-100 fw-bold py-2 mt-2">
-            ✅ Salvar Pet para Adoção
+          <button className="btn btn-warning w-100 fw-bold">
+            Salvar Pet
           </button>
         </form>
       </div>

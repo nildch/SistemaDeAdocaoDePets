@@ -12,7 +12,7 @@ export default function AuthProvider({ children }) {
   }, []);
 
   function login(email, password) {
-    // ADMIN FIXO
+    // 🔐 ADMIN FIXO
     if (email === "admin@patinhas.com" && password === "admin123") {
       const admin = { email, role: "admin" };
       setUser(admin);
@@ -20,15 +20,16 @@ export default function AuthProvider({ children }) {
       return true;
     }
 
-    // USUÁRIO NORMAL
+    // 👤 USUÁRIO NORMAL
     const usuarios = JSON.parse(localStorage.getItem("usuarios")) || [];
     const usuarioValido = usuarios.find(
-      u => u.email === email && u.password === password
+      (u) => u.email === email && u.password === password
     );
 
     if (usuarioValido) {
-      setUser({ email, role: "user" });
-      saveAuth({ email, role: "user" });
+      const userData = { email, role: "user" };
+      setUser(userData);
+      saveAuth(userData);
       return true;
     }
 

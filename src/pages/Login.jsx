@@ -1,37 +1,101 @@
-import { useContext, useRef, useState } from "react";
+import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthCont.jsx";
 import { useNavigate, Link } from "react-router-dom";
+
+const R = {
+  email: /^\S+@\S+\.\S+$/
+};
+
+const LABELS = {
+  email: "E-mail",
+  password: "Senha"
+};
 
 export default function Login() {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    email: "",
+    password: ""
+  });
 
-  function handleSubmit(e) {
+  const [fe, setFe] = useState({});
+
+  const liveValidate = (name, value) => {
+    let error = null;
+
+    if (name === "email") {
+      if (!value)
+        error = `O campo ${LABELS.email} é obrigatório`;
+      else if (!R.email.test(value))
+        error = `Informe um ${LABELS.email} válido`;
+    }
+
+    if (name === "password") {
+      if (!value)
+        error = `O campo ${LABELS.password} é obrigatório`;
+    }
+
+    setFe(p => ({ ...p, [name]: error }));
+    return error;
+  };
+
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setForm(p => ({ ...p, [name]: value }));
+    liveValidate(name, value);
+  };
+
+  const validateFinal = () => {
+    const e = {};
+
+    Object.keys(LABELS).forEach(k => {
+      if (!form[k]) {
+        e[k] = `O campo ${LABELS[k]} é obrigatório`;
+      }
+    });
+
+    Object.keys(form).forEach(k => {
+      const err = liveValidate(k, form[k]);
+      if (err) e[k] = err;
+    });
+
+    setFe(e);
+    return !Object.keys(e).length;
+  };
+
+  const handleSubmit = e => {
     e.preventDefault();
-    setError("");
+    if (!validateFinal()) return;
 
-    if (!email) {
-      setError("Preencha o campo de E-mail");
-      return;
-    }
-
-    if (!password) {
-      setError("Preencha o campo de Senha");
-      return;
-    }
-
-    const sucesso = login(email, password);
+    const sucesso = login(form.email, form.password);
     if (!sucesso) {
-      setError("Credenciais inválidas");
+      setFe({
+        email: "E-mail ou senha inválidos",
+        password: "E-mail ou senha inválidos"
+      });
       return;
     }
 
     navigate("/");
-  }
+  };
+
+  const input = (name, type) => (
+    <div className="mb-3">
+      <label className="form-label fw-semibold">{LABELS[name]}</label>
+      <input
+        type={type}
+        name={name}
+        value={form[name]}
+        onChange={handleChange}
+        className={`form-control ${fe[name] ? "is-invalid" : ""}`}
+      />
+      {fe[name] && (
+        <div className="invalid-feedback d-block">{fe[name]}</div>
+      )}
+    </div>
+  );
 
   return (
     <div className="container mt-5" style={{ maxWidth: "420px" }}>
@@ -40,25 +104,10 @@ export default function Login() {
       </h2>
 
       <form onSubmit={handleSubmit}>
-        <input
-          type="email"
-          className="form-control mb-3"
-          placeholder="E-mail cadastrado"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
+        {input("email", "email")}
+        {input("password", "password")}
 
-        <input
-          type="password"
-          className="form-control mb-3"
-          placeholder="Senha"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-
-        {error && <div className="alert alert-danger">{error}</div>}
-
-        <button className="btn btn-warning w-100 mb-3">
+        <button className="btn btn-warning w-100 mb-3 fw-bold">
           Entrar
         </button>
       </form>
