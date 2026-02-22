@@ -1,253 +1,269 @@
 import { useEffect, useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthCont.jsx";
-
-const R = {
-  nome: /^[A-Za-zÀ-ÿ\s]*$/,
-  cpf: /^\d*$/,
-  telefone: /^\d*$/
-};
-
-const LABELS = {
-  nome: "Nome completo",
-  email: "E-mail",
-  cpf: "CPF",
-  telefone: "Telefone"
-};
+import { useNavigate } from "react-router-dom";
 
 export default function Adocao() {
   const { user } = useContext(AuthContext);
-  const nav = useNavigate();
+  const navigate = useNavigate();
 
   const [pets, setPets] = useState([]);
-  const [modal, setModal] = useState(false);
-  const [pet, setPet] = useState(null);
   const [solicitacoes, setSolicitacoes] = useState([]);
+  const [modalAdocao, setModalAdocao] = useState(false);
+  const [petSelecionado, setPetSelecionado] = useState(null);
+  const [form, setForm] = useState({ nome: "", cpf: "", telefone: "" });
+  const [erro, setErro] = useState("");
 
-  const [form, setForm] = useState({ nome: "", email: "", cpf: "", telefone: "" });
-  const [fe, setFe] = useState({});
+  // Estilos de Cores Profissionais
+  const theme = {
+    primary: "#10ac84",
+    primaryDark: "#0d8d6d",
+    secondary: "#222f3e",
+    accent: "#ff9f43",
+    light: "#f8fafc",
+    white: "#ffffff",
+    grayText: "#64748b"
+  };
 
   useEffect(() => {
-    if (!user) return nav("/");
     setPets(JSON.parse(localStorage.getItem("pets")) || []);
     setSolicitacoes(JSON.parse(localStorage.getItem("solicitacoes")) || []);
-  }, [user, nav]);
+  }, []);
 
-  const salvarPets = lista => {
-    setPets(lista);
-    localStorage.setItem("pets", JSON.stringify(lista));
+  const atualizarDados = (novosPets, novasSols) => {
+    setPets(novosPets);
+    setSolicitacoes(novasSols);
+    localStorage.setItem("pets", JSON.stringify(novosPets));
+    localStorage.setItem("solicitacoes", JSON.stringify(novasSols));
   };
 
-  const petsParaMostrar = user?.role === "admin" 
-    ? pets 
-    : pets.filter(p => p.statusAdocao === "Disponível");
-
-  const adotados = pets.filter(p => p.statusAdocao === "Adotado");
-
-  const marcarAdotado = id =>
-    salvarPets(
-      pets.map(p => p.id === id ? { ...p, statusAdocao: "Adotado" } : p)
-    );
-
-  const remover = id =>
-    window.confirm("Remover pet?") &&
-    salvarPets(pets.filter(p => p.id !== id));
-
-  const alterarStatus = (id, novoStatus) => {
-    const lista = solicitacoes.map(s => s.id === id ? { ...s, status: novoStatus } : s);
-    setSolicitacoes(lista);
-    localStorage.setItem("solicitacoes", JSON.stringify(lista));
+  const handleNomeChange = (e) => {
+    const v = e.target.value.replace(/[^A-Za-zÀ-ÿ\s]/g, "");
+    setForm({ ...form, nome: v });
   };
 
-  const abrir = p => { setPet(p); setModal(true); };
-  const fechar = () => { setModal(false); setForm({ nome:"", email:"", cpf:"", telefone:"" }); setFe({}); };
-
-  const liveValidate = (name, value) => {
-    let error = null;
-    if (name === "nome") {
-      if (!R.nome.test(value)) error = "O campo Nome aceita apenas letras e espaços";
-      else if (value && value.length < 11) error = "Nome deve ter no mínimo 11 caracteres";
-    }
-    if (name === "email" && value && !value.includes("@")) error = "Informe um e-mail válido";
-    if (name === "cpf") {
-      if (!R.cpf.test(value)) error = "CPF aceita apenas números";
-      else if (value && value.length !== 11) error = "CPF deve conter 11 números";
-    }
-    if (name === "telefone") {
-      if (!R.telefone.test(value)) error = "Telefone aceita apenas números";
-      else if (value && (value.length < 8 || value.length > 15)) error = "Telefone deve ter entre 8 e 15 números";
-    }
-    setFe(p => ({ ...p, [name]: error }));
-    return error;
+  const handleTelefoneChange = (e) => {
+    const v = e.target.value.replace(/[^0-9()-\s]/g, "");
+    setForm({ ...form, telefone: v });
   };
 
-  const ch = e => {
-    const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
-    liveValidate(name, value);
+  const handleCpfChange = (e) => {
+    const v = e.target.value.replace(/\D/g, "");
+    setForm({ ...form, cpf: v });
   };
 
-  const validarFinal = () => {
-    const e = {};
-    Object.keys(LABELS).forEach(k => { if (!form[k]) e[k] = `O campo ${LABELS[k]} é obrigatório`; });
-    Object.keys(form).forEach(k => { const err = liveValidate(k, form[k]); if (err) e[k] = err; });
-    setFe(e);
-    return !Object.keys(e).length;
-  };
-
-  const enviar = e => {
+  const enviarSolicitacao = (e) => {
     e.preventDefault();
-    if (!validarFinal()) return;
-    const novaSolicitacao = { id: Date.now(), petId: pet.id, petNome: pet.nome, adotante: { ...form }, status: "Pendente", data: new Date().toLocaleString() };
-    const lista = [...solicitacoes, novaSolicitacao];
-    setSolicitacoes(lista);
-    localStorage.setItem("solicitacoes", JSON.stringify(lista));
-    alert("Solicitação enviada com sucesso!");
-    fechar();
+    if (form.nome.trim().length < 11 || form.cpf.length !== 11) {
+      setErro("Preencha o nome completo e o CPF corretamente.");
+      return;
+    }
+    const nova = {
+      id: Date.now(),
+      petId: petSelecionado.id,
+      petNome: petSelecionado.nome,
+      adotanteId: user.id,
+      userName: form.nome,
+      userCpf: form.cpf,
+      userTel: form.telefone,
+      status: "Pendente"
+    };
+    atualizarDados(pets, [...solicitacoes, nova]);
+    setModalAdocao(false);
+    setForm({ nome: "", cpf: "", telefone: "" });
+    setErro("");
+  };
+
+  const gerenciarSolicitacao = (solId, novoStatus) => {
+    const sol = solicitacoes.find(s => s.id === solId);
+    const novasSols = solicitacoes.map(s => s.id === solId ? { ...s, status: novoStatus } : s);
+    let novosPets = [...pets];
+    if (novoStatus === "Aprovado") {
+      novosPets = pets.map(p => p.id === sol.petId ? { ...p, statusAdocao: "Adotado" } : p);
+    }
+    atualizarDados(novosPets, novasSols);
+  };
+
+  const verDetalhes = (id) => navigate(`/pet/${id}`);
+
+  const abrirAdocao = (e, pet) => {
+    e.stopPropagation(); 
+    if (!user) { navigate("/login"); return; }
+    setPetSelecionado(pet);
+    setModalAdocao(true);
+  };
+
+  const disponiveis = pets.filter(p => p.statusAdocao !== "Adotado");
+  const adotados = pets.filter(p => p.statusAdocao === "Adotado");
+  const minhasSols = user ? solicitacoes.filter(s => s.adotanteId === user.id) : [];
+  const solsPendentes = solicitacoes.filter(s => s.status === "Pendente");
+
+  const jaSolicitado = (petId) => {
+    if (!user) return false;
+    return solicitacoes.some(s => s.petId === petId && s.adotanteId === user.id);
   };
 
   return (
-    <div style={{ backgroundColor: "#fdfdfd", minHeight: "100vh", paddingBottom: "50px" }}>
+    <div style={{ backgroundColor: theme.light, minHeight: "100vh", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="container py-5">
-        <header className="text-center mb-5">
-          <h1 className="fw-bold display-4" style={{ color: "#FF6F00" }}>Encontre seu Novo Amigo</h1>
-          <p className="text-muted fs-5">
-            {user?.role === "admin" 
-              ? `Painel de Gerenciamento: ${petsParaMostrar.length} pets cadastrados` 
-              : `Existem ${petsParaMostrar.length} amiguinhos esperando por você`}
-          </p>
-        </header>
+        
+        {/* Header Elegante */}
+        <div className="text-center mb-5">
+          <h1 className="fw-bolder mb-2" style={{ color: theme.secondary, letterSpacing: "-1px", fontSize: "2.8rem" }}>
+            Mude uma vida <span style={{ color: theme.primary }}>hoje</span>
+          </h1>
+          <p style={{ color: theme.grayText, fontSize: "1.1rem" }}>Explore nossos amigos que buscam um novo lar e muito carinho.</p>
+        </div>
 
-        {/* LISTA PETS */}
-        <div className="row g-4">
-          {petsParaMostrar.map(p => (
-            <div key={p.id} className="col-md-6 col-lg-4">
-              <div 
-                className={`card h-100 shadow-sm border-0 ${p.statusAdocao === "Adotado" ? "opacity-75" : ""}`}
-                style={{ borderRadius: "20px", overflow: "hidden", transition: "0.3s" }}
-              >
-                <div style={{ position: "relative" }}>
-                  <img src={p.foto} alt={p.nome} style={{ height: "250px", width: "100%", objectFit: "cover" }} />
-                  <span 
-                    className={`badge position-absolute top-0 end-0 m-3 px-3 py-2 ${p.statusAdocao === "Adotado" ? "bg-success" : "bg-warning text-dark"}`}
-                    style={{ borderRadius: "10px" }}
-                  >
-                    {p.statusAdocao}
-                  </span>
-                </div>
-
-                <div className="card-body text-center p-4">
-                  <h4 className="fw-bold mb-1" style={{ color: "#333" }}>{p.nome}</h4>
-                  <p className="text-muted mb-4">{p.especie} • {p.porte}</p>
-
-                  <div className="d-grid gap-2">
-                    {user?.role === "user" && (
-                      <button className="btn btn-warning fw-bold py-2" style={{ borderRadius: "12px" }} onClick={() => abrir(p)}>
-                        Adotar
-                      </button>
-                    )}
-
-                    {user?.role === "admin" && (
-                      <>
-                        {p.statusAdocao === "Disponível" && (
-                          <button className="btn btn-success fw-bold py-2" style={{ borderRadius: "12px" }} onClick={() => marcarAdotado(p.id)}>
-                            Marcar como Adotado
-                          </button>
-                        )}
-                        <button className="btn btn-outline-danger btn-sm border-2 fw-bold" style={{ borderRadius: "10px" }} onClick={() => remover(p.id)}>
-                          Remover do Sistema
-                        </button>
-                      </>
+        {/* Vitrine de Pets */}
+        <div className="row g-4 justify-content-center">
+          {disponiveis.length > 0 ? (
+            disponiveis.map(p => (
+              <div key={p.id} className="col-sm-6 col-lg-3">
+                <div 
+                  className="card border-0 shadow-sm h-100" 
+                  style={{ borderRadius: "28px", backgroundColor: theme.white, transition: "transform 0.3s ease, box-shadow 0.3s ease", cursor: "pointer", overflow: "hidden" }}
+                  onClick={() => verDetalhes(p.id)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-8px)";
+                    e.currentTarget.style.boxShadow = "0 20px 25px -5px rgba(0, 0, 0, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  <div style={{ height: "280px", position: "relative" }}>
+                    <img src={p.foto} className="w-100 h-100" style={{ objectFit: "cover" }} alt={p.nome} />
+                    <div className="position-absolute bottom-0 start-0 m-3 px-3 py-1 rounded-pill" style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(4px)", fontSize: "0.7rem", fontWeight: "700", color: theme.secondary }}>
+                      {p.porte.toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="card-body p-4 text-center">
+                    <h5 className="fw-bold mb-1" style={{ color: theme.secondary }}>{p.nome}</h5>
+                    <p className="small mb-4" style={{ color: theme.grayText }}>{p.raca}</p>
+                    
+                    {(!user || user.role !== "admin") && (
+                      !user ? (
+                        <button className="btn btn-warning w-100 rounded-pill py-2 fw-bold text-white" style={{ border: "none", background: theme.accent }} onClick={(e) => abrirAdocao(e, p)}>Login para Adotar</button>
+                      ) : jaSolicitado(p.id) ? (
+                        <button className="btn btn-light w-100 rounded-pill py-2 fw-bold text-muted" disabled>✔ Solicitado</button>
+                      ) : (
+                        <button className="btn w-100 rounded-pill py-2 fw-bold text-white shadow-sm" style={{ border: "none", backgroundColor: theme.primary }} onClick={(e) => abrirAdocao(e, p)}>Quero Adotar</button>
+                      )
                     )}
                   </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="text-center p-5 rounded-5" style={{ background: "#fff", border: "1px dashed #cbd5e1" }}>
+              <h4 className="text-muted">Nenhum pet disponível no momento 🐾</h4>
             </div>
-          ))}
+          )}
         </div>
 
-        
-        {user?.role === "user" && (
-          <section className="mt-5 pt-5 border-top">
-            <h3 className="fw-bold text-center mb-4" style={{ color: "#FF6F00" }}>Minhas solicitações</h3>
-            <div className="row justify-content-center g-3">
-              {solicitacoes.filter(s => s.adotante.email === user.email).map(s => (
-                <div key={s.id} className="col-md-6">
-                  <div className="card shadow-sm border-0 p-3" style={{ borderRadius: "15px", backgroundColor: "#fff" }}>
-                    <div className="d-flex justify-content-between align-items-center">
+        {/* Minhas Solicitações (User) */}
+        {user && user.role === "user" && minhasSols.length > 0 && (
+          <div className="mt-5 pt-5">
+            <h4 className="fw-bold mb-4" style={{ color: theme.secondary }}>📋 Acompanhe seus Pedidos</h4>
+            <div className="row g-3">
+              {minhasSols.map(s => (
+                <div key={s.id} className="col-12 col-md-6">
+                  <div className="p-4 bg-white rounded-4 shadow-sm d-flex align-items-center justify-content-between border-0" style={{ cursor: "pointer" }} onClick={() => verDetalhes(s.petId)}>
+                    <div className="d-flex align-items-center">
+                      <div className="bg-light rounded-circle p-3 me-3">🐶</div>
                       <div>
-                        <h6 className="mb-1 fw-bold">Pet: {s.petNome}</h6>
-                        <small className="text-muted">{s.data}</small>
+                        <h6 className="mb-0 fw-bold">{s.petNome}</h6>
+                        <small style={{ color: theme.grayText }}>Clique para ver detalhes</small>
                       </div>
-                      <span className={`badge ${s.status === "Aprovado" ? "bg-success" : s.status === "Recusado" ? "bg-danger" : "bg-warning text-dark"}`}>
-                        {s.status}
-                      </span>
                     </div>
+                    <span className="badge rounded-pill px-3 py-2" style={{ backgroundColor: s.status === 'Aprovado' ? `${theme.primary}20` : s.status === 'Negado' ? '#fee2e2' : '#fef3c7', color: s.status === 'Aprovado' ? theme.primary : s.status === 'Negado' ? '#ef4444' : theme.accent }}>
+                      {s.status.toUpperCase()}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
-          </section>
+          </div>
         )}
 
-        {user?.role === "admin" && (
-          <section className="mt-5 pt-5 border-top">
-            <h3 className="fw-bold text-center mb-4 text-primary">Gerenciar Pedidos de Adoção</h3>
-            <div className="table-responsive shadow-sm bg-white p-3" style={{ borderRadius: "20px" }}>
-              <table className="table align-middle">
-                <thead>
-                  <tr>
-                    <th>Pet</th>
-                    <th>Adotante</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {solicitacoes.map(s => (
-                    <tr key={s.id}>
-                      <td className="fw-bold">{s.petNome}</td>
-                      <td>{s.adotante.nome}<br/><small className="text-muted">{s.adotante.telefone}</small></td>
-                      <td><span className="badge bg-light text-dark border">{s.status}</span></td>
-                      <td>
-                        {s.status === "Pendente" && (
-                          <div className="btn-group shadow-sm">
-                            <button className="btn btn-success btn-sm" onClick={() => alterarStatus(s.id, "Aprovado")}>Aprovar</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => alterarStatus(s.id, "Recusado")}>Recusar</button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-      </div>
-
-      {modal && (
-        <div className="modal d-block" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <form className="modal-content border-0 shadow-lg" style={{ borderRadius: "20px" }} onSubmit={enviar}>
-              <div className="modal-header border-0">
-                <h5 className="fw-bold">Adotar {pet.nome}</h5>
-                <button type="button" className="btn-close" onClick={fechar} />
+        {/* Painel Administrativo */}
+        {user && user.role === "admin" && (
+          <div className="mt-5">
+            <div className="card border-0 shadow-lg rounded-5 overflow-hidden mb-5">
+              <div className="card-header border-0 py-4 px-4 d-flex justify-content-between align-items-center" style={{ backgroundColor: theme.secondary }}>
+                <h5 className="text-white fw-bold mb-0">Solicitações Pendentes</h5>
+                <span className="badge bg-white text-dark rounded-pill px-3">{solsPendentes.length}</span>
               </div>
-              <div className="modal-body p-4">
-                {Object.keys(LABELS).map(c => (
-                  <div key={c} className="mb-3">
-                    <label className="form-label small fw-bold text-muted">{LABELS[c]}</label>
-                    <input name={c} value={form[c]} onChange={ch} className={`form-control border-0 bg-light p-2 ${fe[c] ? "is-invalid" : ""}`} style={{ borderRadius: "10px" }} />
-                    {fe[c] && <div className="invalid-feedback d-block">{fe[c]}</div>}
+              <div className="p-4 bg-white">
+                {solsPendentes.length > 0 ? (
+                  <div className="table-responsive">
+                    <table className="table table-hover align-middle">
+                      <thead className="small text-uppercase fw-bold" style={{ color: theme.grayText }}>
+                        <tr><th>PET</th><th>CANDIDATO</th><th className="text-center">AÇÕES</th></tr>
+                      </thead>
+                      <tbody>
+                        {solsPendentes.map(s => (
+                          <tr key={s.id}>
+                            <td className="fw-bold" style={{ color: theme.primary, cursor: "pointer" }} onClick={() => verDetalhes(s.petId)}>{s.petNome} 🔍</td>
+                            <td>{s.userName} <br/> <small className="text-muted">{s.userTel}</small></td>
+                            <td className="text-center">
+                              <button className="btn btn-sm px-4 rounded-pill fw-bold text-white me-2 shadow-sm" style={{ backgroundColor: theme.primary, border: "none" }} onClick={() => gerenciarSolicitacao(s.id, "Aprovado")}>Aprovar</button>
+                              <button className="btn btn-sm btn-outline-danger px-4 rounded-pill fw-bold" onClick={() => gerenciarSolicitacao(s.id, "Negado")}>Negar</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-center py-4 text-muted">Nenhuma solicitação aguardando.</p>}
+              </div>
+            </div>
+
+            {/* Galeria de Sucesso */}
+            <div className="bg-white p-5 rounded-5 shadow-sm">
+              <h5 className="fw-bold mb-4" style={{ color: theme.primary }}>✨ Galeria de Adotados</h5>
+              <div className="d-flex gap-4 overflow-auto pb-3">
+                {adotados.map(p => (
+                  <div key={p.id} className="text-center" style={{ minWidth: "150px", cursor: "pointer" }} onClick={() => verDetalhes(p.id)}>
+                    <img src={p.foto} style={{ width: "120px", height: "120px", objectFit: "cover", borderRadius: "40px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)" }} alt={p.nome} />
+                    <div className="mt-3 fw-bold small text-dark">{p.nome}</div>
                   </div>
                 ))}
               </div>
-              <div className="modal-footer border-0 pb-4">
-                <button type="button" className="btn btn-light px-4" onClick={fechar}>Cancelar</button>
-                <button className="btn btn-success px-5 fw-bold" style={{ borderRadius: "10px", backgroundColor: "#2ecc71", border: "none" }}>Enviar pedido</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modal Glassmorphism */}
+      {modalAdocao && (
+        <div className="modal d-block" style={{ backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(10px)" }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-2xl" style={{ borderRadius: "40px", padding: "1.2rem" }}>
+              <div className="modal-header border-0 pb-0">
+                <h3 className="fw-bold" style={{ color: theme.secondary, letterSpacing: "-1px" }}>Formulário de Adoção</h3>
+                <button className="btn-close" onClick={() => setModalAdocao(false)}></button>
               </div>
-            </form>
+              <form onSubmit={enviarSolicitacao} className="p-4">
+                {erro && <div className="alert alert-danger border-0 rounded-4 py-2 small mb-4">{erro}</div>}
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-muted">Nome Completo</label>
+                  <input type="text" className="form-control rounded-4 p-3 bg-light border-0 shadow-inner" required value={form.nome} onChange={handleNomeChange} placeholder="Ex: Maria Oliveira" />
+                </div>
+                <div className="row">
+                  <div className="col-6 mb-3">
+                    <label className="form-label small fw-bold text-muted">CPF</label>
+                    <input type="text" className="form-control rounded-4 p-3 bg-light border-0 shadow-inner" maxLength="11" required value={form.cpf} onChange={handleCpfChange} />
+                  </div>
+                  <div className="col-6 mb-3">
+                    <label className="form-label small fw-bold text-muted">WhatsApp</label>
+                    <input type="text" className="form-control rounded-4 p-3 bg-light border-0 shadow-inner" required value={form.telefone} onChange={handleTelefoneChange} />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-lg w-100 rounded-pill fw-bold mt-4 text-white shadow-lg" style={{ backgroundColor: theme.primary, border: "none" }}>Enviar Solicitação</button>
+              </form>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,9 @@
 import { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../context/AuthProvider";
 
+const FOTO_PADRAO =
+  "https://via.placeholder.com/400x300?text=Pet+Adotado";
+
 export default function PetList() {
   const { user } = useContext(AuthContext);
   const [pets, setPets] = useState([]);
@@ -10,124 +13,106 @@ export default function PetList() {
     setPets(dados);
   }, []);
 
-  function salvar(petsAtualizados) {
-    setPets(petsAtualizados);
-    localStorage.setItem("pets", JSON.stringify(petsAtualizados));
+  function salvar(lista) {
+    setPets(lista);
+    localStorage.setItem("pets", JSON.stringify(lista));
   }
 
   function removerPet(id) {
     if (!window.confirm("Deseja remover este pet?")) return;
-    const filtrados = pets.filter(p => p.id !== id);
-    salvar(filtrados);
+    salvar(pets.filter(p => p.id !== id));
   }
 
   function marcarAdotado(id) {
-    const atualizados = pets.map(p =>
-      p.id === id ? { ...p, statusAdocao: "Adotado" } : p
+    salvar(
+      pets.map(p =>
+        p.id === id ? { ...p, statusAdocao: "Adotado" } : p
+      )
     );
-    salvar(atualizados);
   }
 
-  const petsParaMostrar = pets.filter(p => {
-    if (user?.role === "admin") return true; // Admin vê TUDO (Disponível e Adotado)
-    return p.statusAdocao === "Disponível";  // Usuário vê apenas Disponível
-  });
+  const disponiveis = pets.filter(p => p.statusAdocao === "Disponível");
+  const adotados = pets.filter(p => p.statusAdocao === "Adotado");
 
-  return (
-    <div style={{ backgroundColor: "#fdf8f5", minHeight: "100vh", padding: "40px 0" }}>
-      <div className="container">
-        
-        <div className="text-center mb-5">
-          <h2 className="fw-bold display-5" style={{ color: "#4e342e" }}>
-            {user?.role === "admin" ? "Painel do Administrador ⚙️" : "Encontre seu Novo Amigo 🐾"}
-          </h2>
-          <p className="text-muted">
-            {user?.role === "admin" 
-              ? `Gerenciando ${pets.length} pets no total` 
-              : "Amizade não se compra, se encontra."}
-          </p>
-        </div>
+  function CardPet({ pet, adotado }) {
+    return (
+      <div className="col-md-6 col-lg-4">
+        <div className={`card shadow h-100 ${adotado ? "border-success" : ""}`}>
+          <img
+            src={pet.foto || FOTO_PADRAO}
+            alt={pet.nome}
+            style={{ height: 220, objectFit: "cover" }}
+          />
 
-        <div className="row g-4">
-          {petsParaMostrar.length > 0 ? (
-            petsParaMostrar.map(pet => (
-              <div className="col-md-6 col-lg-4" key={pet.id}>
-                <div 
-                  className="pet-card shadow" 
-                  style={{ 
-                    opacity: pet.statusAdocao === "Adotado" ? 0.8 : 1,
-                    border: pet.statusAdocao === "Adotado" ? "2px solid #2ecc71" : "none" 
-                  }}
-                >
-                  <div className="pet-img-container">
-                    <img src={pet.foto} className="pet-img" alt={pet.nome} />
-                    <div className={`pet-badge ${pet.statusAdocao === "Adotado" ? "bg-success text-white" : ""}`}>
-                      {pet.statusAdocao === "Adotado" ? "ADOTADO" : pet.porte}
-                    </div>
-                  </div>
+          <div className="card-body text-center">
+            <h5 className="fw-bold">{pet.nome}</h5>
+            <p className="text-muted">{pet.animal}</p>
 
-                  <div className="card-body p-4 text-center">
-                    <h4 className="fw-bold mb-1">{pet.nome}</h4>
-                    <p className="text-uppercase small fw-bold text-warning mb-3">
-                      {pet.especie}
-                    </p>
-                  </div>
+            {adotado && (
+              <span className="badge bg-success">Adotado</span>
+            )}
+          </div>
 
-                  <div className="p-3 bg-light border-top d-flex flex-column gap-2">
-                    
-                    {/* BOTÕES DO ADMIN */}
-                    {user?.role === "admin" && (
-                      <>
-                        {pet.statusAdocao !== "Adotado" && (
-                          <button
-                            className="btn btn-adotado w-100"
-                            onClick={() => marcarAdotado(pet.id)}
-                          >
-                            Marcar como adotado
-                          </button>
-                        )}
-                        <button
-                          className="btn btn-remover w-100"
-                          onClick={() => removerPet(pet.id)}
-                        >
-                          Remover Pet
-                        </button>
-                      </>
-                    )}
+          {!adotado && (
+            <div className="card-footer bg-light">
+              {user?.role === "admin" && (
+                <>
+                  <button
+                    className="btn btn-success w-100 mb-2"
+                    onClick={() => marcarAdotado(pet.id)}
+                  >
+                    Marcar como adotado
+                  </button>
 
-                    {/* BOTÃO DO USUÁRIO */}
-                    {user?.role === "user" && (
-                      <button className="btn btn-adotar-agora w-100">
-                        Quero Adotar
-                      </button>
-                    )}
+                  <button
+                    className="btn btn-outline-danger w-100"
+                    onClick={() => removerPet(pet.id)}
+                  >
+                    Remover pet
+                  </button>
+                </>
+              )}
 
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center p-5">
-              <p className="text-muted">Nenhum pet encontrado.</p>
+              {user?.role === "user" && (
+                <button className="btn btn-warning w-100">
+                  Quero adotar
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
+    );
+  }
 
-      <style>{`
-        .pet-card { background: white; border-radius: 20px; overflow: hidden; transition: 0.3s; }
-        .pet-card:hover { transform: translateY(-5px); }
-        .pet-img-container { position: relative; height: 230px; }
-        .pet-img { width: 100%; height: 100%; object-fit: cover; }
-        .pet-badge { 
-          position: absolute; top: 15px; right: 15px; 
-          background: white; padding: 5px 15px; border-radius: 50px; 
-          font-weight: bold; font-size: 0.75rem; color: #FF6F00;
-        }
-        .btn-adotar-agora { background: #FF6F00; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: bold; }
-        .btn-adotado { background: #2ecc71; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: bold; }
-        .btn-remover { background: white; color: #e74c3c; border: 1px solid #e74c3c; padding: 10px; border-radius: 10px; font-weight: bold; }
-      `}</style>
+  return (
+    <div style={{ background: "#fdf8f5", minHeight: "100vh", padding: "40px 0" }}>
+      <div className="container">
+
+        <h3 className="mb-4">Pets disponíveis</h3>
+        <div className="row g-4">
+          {disponiveis.length ? (
+            disponiveis.map(pet => (
+              <CardPet key={pet.id} pet={pet} />
+            ))
+          ) : (
+            <p className="text-muted">Nenhum pet disponível.</p>
+          )}
+        </div>
+
+        {adotados.length > 0 && (
+          <>
+            <hr className="my-5" />
+            <h3 className="mb-4 text-success">Pets adotados</h3>
+
+            <div className="row g-4">
+              {adotados.map(pet => (
+                <CardPet key={pet.id} pet={pet} adotado />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
